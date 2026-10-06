@@ -1,0 +1,7 @@
+host/config.json
+.venv/
+venv/
+.pio/
+build/
+__pycache__/
+.DS_Store
