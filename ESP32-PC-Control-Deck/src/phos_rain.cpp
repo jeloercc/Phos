@@ -88,7 +88,14 @@ void PhosRain::draw(TFT_eSprite &sprite) {
                                         (py - rightY) * (py - rightY));
       const float distance = min(leftDistance - leftRadius,
                                  rightDistance - rightRadius);
-      if (distance < 10.0f) {
+      const float eyeGapLeft = min(leftX, rightX) + 13.0f;
+      const float eyeGapRight = max(leftX, rightX) - 13.0f;
+      const float eyeGapY = (leftY + rightY) * 0.5f;
+      const bool betweenEyes = px > eyeGapLeft && px < eyeGapRight &&
+                               fabsf(py - eyeGapY) < 12.0f;
+      if (betweenEyes) {
+        brightness = max(brightness, 1);
+      } else if (distance < 10.0f) {
         brightness = 0;
       } else if (distance < 34.0f) {
         brightness = brightness > 0

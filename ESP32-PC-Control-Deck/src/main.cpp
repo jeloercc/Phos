@@ -199,6 +199,7 @@ void loop() {
       const int16_t x = 45 + (index % 4) * 76;
       const int16_t y = 42 + (index / 4) * 48;
       eyes.drawGalleryCell(sprite, x, y, static_cast<Emotion>(index));
+      sprite.setTextColor(5, 0);
       sprite.drawString(names[index], x - 27, y + 19, 5);
     }
     sprite.pushSprite(0, 0);
