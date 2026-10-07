@@ -91,7 +91,9 @@ void PhosRain::draw(TFT_eSprite &sprite) {
       if (distance < 10.0f) {
         brightness = 0;
       } else if (distance < 34.0f) {
-        brightness = static_cast<int>(brightness * (distance - 10.0f) / 24.0f);
+        brightness = brightness > 0
+                         ? max(1, static_cast<int>(brightness * (distance - 10.0f) / 24.0f))
+                         : 0;
       }
       if (mode_ == RainMode::CALM) brightness = min(brightness, 3);
       if (brightness > 0) {

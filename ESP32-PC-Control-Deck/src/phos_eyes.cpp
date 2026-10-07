@@ -103,3 +103,22 @@ void PhosEyes::draw(TFT_eSprite &sprite, const BodyState &body) {
           static_cast<int16_t>(blink && gesture_ == Gesture::WINK_R ? 3 : height), happy,
           blink && gesture_ == Gesture::WINK_R, false);
 }
+
+void PhosEyes::drawGalleryCell(TFT_eSprite &sprite, int16_t x, int16_t y,
+                               Emotion emotion) {
+  const Emotion previous = emotion_;
+  const uint8_t previousIntensity = emotionIntensity_;
+  emotion_ = emotion;
+  emotionIntensity_ = 100;
+  const float factor = emotionFactor(emotion);
+  int16_t height = static_cast<int16_t>(34.0f * factor);
+  if (emotion == Emotion::SKEPTICAL) height = 17;
+  drawEye(sprite, x - 15, y, height, emotion == Emotion::HAPPY ||
+          emotion == Emotion::JOY || emotion == Emotion::LOVE ||
+          emotion == Emotion::PROUD, false, true);
+  drawEye(sprite, x + 15, y, height, emotion == Emotion::HAPPY ||
+          emotion == Emotion::JOY || emotion == Emotion::LOVE ||
+          emotion == Emotion::PROUD, false, false);
+  emotion_ = previous;
+  emotionIntensity_ = previousIntensity;
+}

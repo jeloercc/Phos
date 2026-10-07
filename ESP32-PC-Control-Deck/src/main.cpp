@@ -17,6 +17,10 @@ uint32_t rainUs = 0, bodyUs = 0, eyesUs = 0, pushUs = 0;
 char line[64];
 uint8_t lineLength = 0;
 bool lastBoot = HIGH;
+bool galleryMode = false;
+bool demoMode = false;
+uint32_t demoStarted = 0;
+uint8_t demoStage = 0;
 const uint16_t PHOS_PALETTE[16] = {
     0x0000, 0x08C1, 0x1181, 0x2283, 0x3365, 0x4CC7, 0x6E2A, 0x872E,
     0xB794, 0xDFFA, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000};
@@ -84,6 +88,8 @@ bool setGestureByName(const char *name) {
   return false;
 }
 void applyState(const char *state) {
+  galleryMode = false;
+  demoMode = false;
   eyes.setMood(moodFor(state));
   if (!strcmp(state, "THINKING")) { body.setBehavior(Behavior::ORBIT); rain.setMode(RainMode::FAST); }
   else if (!strcmp(state, "SPEAKING") || !strcmp(state, "LISTENING")) {
@@ -99,8 +105,8 @@ void command(char *value) {
   if (!strcmp(value, "PING")) Serial.println("OK:PONG");
   else if (!strcmp(value, "SNAP")) { sendSnapshot(); }
   else if (!strcmp(value, "PAL")) { paletteOk(); }
-  else if (!strcmp(value, "DEMO")) { applyState("BOOT"); Serial.println("OK:DEMO"); }
-  else if (!strcmp(value, "GALLERY")) { eyes.setMood(Mood::HAPPY); Serial.println("OK:GALLERY"); }
+  else if (!strcmp(value, "DEMO")) { demoMode = true; galleryMode = false; demoStarted = millis(); demoStage = 0; Serial.println("OK:DEMO"); }
+  else if (!strcmp(value, "GALLERY")) { galleryMode = true; demoMode = false; Serial.println("OK:GALLERY"); }
   else if (!strcmp(value, "IDLE") || !strcmp(value, "LISTENING") ||
            !strcmp(value, "THINKING") || !strcmp(value, "SPEAKING") || !strcmp(value, "SLEEP")) {
     applyState(value); Serial.print("OK:"); Serial.println(value);
@@ -184,6 +190,49 @@ void loop() {
   const float dt = min(0.08f, (now - lastFrame) / 1000.0f);
   if (dt < 0.02f) return;
   lastFrame = now; sprite.fillSprite(0);
+  if (galleryMode) {
+    static const char *names[] = {"NEUTRAL", "HAPPY", "JOY", "LOVE", "SAD",
+                                  "ANGRY", "SURPRISED", "SCARED", "SKEPTICAL",
+                                  "CONFUSED", "CURIOUS", "FOCUSED", "BORED",
+                                  "SHY", "PROUD", "DETERMINED", "GLITCH"};
+    for (uint8_t index = 0; index < 17; ++index) {
+      const int16_t x = 45 + (index % 4) * 76;
+      const int16_t y = 42 + (index / 4) * 48;
+      eyes.drawGalleryCell(sprite, x, y, static_cast<Emotion>(index));
+      sprite.drawString(names[index], x - 27, y + 19, 5);
+    }
+    sprite.pushSprite(0, 0);
+    report(now);
+    return;
+  }
+  if (demoMode && now - demoStarted > 4000) {
+    demoStarted = now;
+    static const char *states[] = {"IDLE", "LISTENING", "THINKING", "SPEAKING", "SLEEP"};
+    static const char *emotions[] = {"HAPPY", "JOY", "LOVE", "SAD", "ANGRY",
+                                     "SURPRISED", "SCARED", "SKEPTICAL", "CONFUSED",
+                                     "CURIOUS", "FOCUSED", "BORED", "SHY", "PROUD",
+                                     "DETERMINED", "GLITCH"};
+    if (demoStage < 5) {
+      applyState(states[demoStage]);
+      demoMode = true;
+      Serial.print("DEMO:STATE "); Serial.println(states[demoStage]);
+    } else if (demoStage < 21) {
+      setEmotionByName(emotions[demoStage - 5], 100, 3000);
+      Serial.print("DEMO:FEEL "); Serial.println(emotions[demoStage - 5]);
+    } else {
+      static const char *gestures[] = {"WINK_L", "WINK_R", "CONFUSED", "LAUGH",
+                                       "NOD", "SHAKE", "ROLL", "STARTLE", "PEEK",
+                                       "DIVE", "LOOP"};
+      const uint8_t gesture = demoStage - 21;
+      if (gesture < 11) {
+        setGestureByName(gestures[gesture]);
+        Serial.print("DEMO:GESTURE "); Serial.println(gestures[gesture]);
+      } else {
+        demoMode = false;
+      }
+    }
+    ++demoStage;
+  }
   uint32_t started = micros(); body.update(dt); bodyUs += micros() - started;
   started = micros(); rain.update(dt, body.state()); rain.draw(sprite); rainUs += micros() - started;
   started = micros(); eyes.update(dt); eyes.draw(sprite, body.state()); eyesUs += micros() - started;

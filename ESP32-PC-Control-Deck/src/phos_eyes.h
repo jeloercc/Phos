@@ -22,6 +22,7 @@ class PhosEyes {
   void begin(uint32_t seed);
   void update(float dt);
   void draw(TFT_eSprite &sprite, const BodyState &body);
+  void drawGalleryCell(TFT_eSprite &sprite, int16_t x, int16_t y, Emotion emotion);
   void setMood(Mood mood);
   void setEmotion(Emotion emotion, uint8_t intensity, uint32_t holdMs);
   void gesture(Gesture gesture);
