@@ -14,6 +14,8 @@ struct BodyState {
   float leftEyeY;
   float rightEyeX;
   float rightEyeY;
+  float leftEyeHalfHeight;
+  float rightEyeHalfHeight;
   float stretch;
   float turn;
   bool moving;

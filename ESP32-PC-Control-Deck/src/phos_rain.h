@@ -22,7 +22,6 @@ class PhosRain {
   };
   Drop drops_[40][2]{};
   uint8_t glyphs_[40][24]{};
-  uint8_t wake_[40][24]{};
   RainMode mode_ = RainMode::NORMAL;
   uint32_t rng_ = 0x12345678u;
   const BodyState *body_ = nullptr;

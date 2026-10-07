@@ -31,7 +31,6 @@ void PhosRain::begin(uint32_t seed) {
     }
     for (uint8_t y = 0; y < 24; ++y) {
       glyphs_[x][y] = random32() % PHOS_GLYPH_COUNT;
-      wake_[x][y] = 0;
     }
   }
 }
@@ -55,21 +54,21 @@ void PhosRain::update(float dt, const BodyState &body) {
       const int newCell = static_cast<int>(item.head);
       if (newCell != oldCell && newCell >= 0 && newCell < 24) {
         glyphs_[x][newCell] = random32() % PHOS_GLYPH_COUNT;
-        wake_[x][newCell] = 18;
       }
     }
     for (uint8_t y = 0; y < 24; ++y) {
-      if (wake_[x][y] > 0) --wake_[x][y];
       if ((random32() % 100) < 3) glyphs_[x][y] = random32() % PHOS_GLYPH_COUNT;
     }
   }
 }
 
 void PhosRain::draw(TFT_eSprite &sprite) {
-  const float eyeX = body_ ? body_->x : 160.0f;
-  const float eyeY = body_ ? body_->y : 120.0f;
-  const bool moving = body_ && body_->moving;
-  const int32_t rx = 83;
+  const float leftX = body_ ? body_->leftEyeX : 130.0f;
+  const float leftY = body_ ? body_->leftEyeY : 120.0f;
+  const float rightX = body_ ? body_->rightEyeX : 190.0f;
+  const float rightY = body_ ? body_->rightEyeY : 120.0f;
+  const float leftRadius = body_ ? body_->leftEyeHalfHeight : 17.0f;
+  const float rightRadius = body_ ? body_->rightEyeHalfHeight : 17.0f;
   for (uint8_t x = 0; x < 40; ++x) {
     for (uint8_t y = 0; y < 24; ++y) {
       int brightness = 0;
@@ -83,12 +82,17 @@ void PhosRain::draw(TFT_eSprite &sprite) {
       }
       const int16_t px = x * 8 + 4;
       const int16_t py = y * 10 + 5;
-      const int32_t dx = px - static_cast<int32_t>(eyeX);
-      const int32_t dy = py - static_cast<int32_t>(eyeY);
-      const int32_t distanceSq = (dx * dx * 100L) / (rx * rx) + dy * dy;
-      if (distanceSq < 38L * 38L) brightness = 0;
-      else if (distanceSq < 52L * 52L) brightness = min(brightness, 1);
-      if (moving && distanceSq >= 50L * 50L && distanceSq < 56L * 56L) brightness = min(9, brightness + 1);
+      const float leftDistance = sqrtf((px - leftX) * (px - leftX) +
+                                       (py - leftY) * (py - leftY));
+      const float rightDistance = sqrtf((px - rightX) * (px - rightX) +
+                                        (py - rightY) * (py - rightY));
+      const float distance = min(leftDistance - leftRadius,
+                                 rightDistance - rightRadius);
+      if (distance < 10.0f) {
+        brightness = 0;
+      } else if (distance < 34.0f) {
+        brightness = static_cast<int>(brightness * (distance - 10.0f) / 24.0f);
+      }
       if (mode_ == RainMode::CALM) brightness = min(brightness, 3);
       if (brightness > 0) {
         const PhosGlyph glyph = PHOS_GLYPHS[glyphs_[x][y]];

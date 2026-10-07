@@ -110,6 +110,8 @@ void PhosBody::update(float dt) {
   current_.rightEyeX = current_.x + 30.0f;
   current_.leftEyeY = current_.y + bob + current_.turn * 4.0f;
   current_.rightEyeY = current_.y + bob - current_.turn * 4.0f;
+  current_.leftEyeHalfHeight = 17.0f;
+  current_.rightEyeHalfHeight = 17.0f;
 }
 
 const BodyState &PhosBody::state() const { return current_; }
