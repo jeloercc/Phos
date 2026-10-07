@@ -17,6 +17,11 @@ void PhosEyes::begin(uint32_t seed) {
 }
 
 void PhosEyes::setMood(Mood mood) { mood_ = mood; }
+void PhosEyes::setEmotion(Emotion emotion, uint8_t intensity, uint32_t holdMs) {
+  emotion_ = emotion;
+  emotionIntensity_ = min<uint8_t>(100, intensity);
+  emotionHoldMs_ = holdMs;
+}
 void PhosEyes::gesture(Gesture gesture) {
   gesture_ = gesture;
   gestureTime_ = 0.0f;
@@ -28,6 +33,13 @@ void PhosEyes::lookAt(float x, float y) {
 
 void PhosEyes::update(float dt) {
   gestureTime_ += dt;
+  if (emotionHoldMs_ > 0) {
+    const uint32_t elapsed = static_cast<uint32_t>(dt * 1000.0f);
+    emotionHoldMs_ = elapsed >= emotionHoldMs_ ? 0 : emotionHoldMs_ - elapsed;
+  } else if (emotionIntensity_ > 0) {
+    const float fade = min(1.0f, dt / 1.5f);
+    emotionIntensity_ = static_cast<uint8_t>(emotionIntensity_ * (1.0f - fade));
+  }
   const float spring = 1.0f - expf(-dt / 0.12f);
   gazeX_ += (targetGazeX_ - gazeX_) * spring;
   gazeY_ += (targetGazeY_ - gazeY_) * spring;
@@ -36,6 +48,14 @@ void PhosEyes::update(float dt) {
     targetGazeY_ = 95.0f + static_cast<float>(random32() % 51);
     gestureTime_ = 0.0f;
   }
+}
+
+float PhosEyes::emotionFactor(Emotion emotion) const {
+    return emotion == Emotion::JOY || emotion == Emotion::SURPRISED ? 1.10f :
+           emotion == Emotion::SCARED || emotion == Emotion::SHY ? 0.90f :
+           emotion == Emotion::ANGRY ? 0.70f :
+           emotion == Emotion::SKEPTICAL || emotion == Emotion::FOCUSED ? 0.75f :
+           1.0f;
 }
 
 void PhosEyes::drawEye(TFT_eSprite &sprite, int16_t x, int16_t y, int16_t height,
@@ -62,13 +82,20 @@ void PhosEyes::drawEye(TFT_eSprite &sprite, int16_t x, int16_t y, int16_t height
 void PhosEyes::draw(TFT_eSprite &sprite, const BodyState &body) {
   const float size = mood_ == Mood::SURPRISED ? 1.2f : 1.0f;
   float height = 34.0f * size;
-  if (mood_ == Mood::SLEEPY) height *= 0.55f;
+  if (mood_ == Mood::SLEEPY || mood_ == Mood::SLEEP) height *= 0.55f;
   if (mood_ == Mood::ANGRY) height *= 0.70f;
   if (mood_ == Mood::SKEPTICAL) height *= 0.75f;
+  const float emotionSize = emotionFactor(emotion_);
+  height *= 1.0f + (emotionSize - 1.0f) * emotionIntensity_ / 100.0f;
+  if (emotion_ == Emotion::CONFUSED) height *= 0.9f;
+  if (emotion_ == Emotion::SCARED) height *= 0.9f;
   if (mood_ == Mood::SPEAKING) height *= 1.0f + sinf(millis() * 0.025f) * 0.12f;
   if (gesture_ == Gesture::STARTLE && gestureTime_ < 0.3f) height *= 0.8f + gestureTime_ * 1.16f;
   const bool blink = gesture_ == Gesture::WINK_L || gesture_ == Gesture::WINK_R;
-  const bool happy = mood_ == Mood::HAPPY || mood_ == Mood::SPEAKING;
+  const bool happy = mood_ == Mood::HAPPY || mood_ == Mood::SPEAKING ||
+                     mood_ == Mood::PET || emotion_ == Emotion::HAPPY ||
+                     emotion_ == Emotion::JOY || emotion_ == Emotion::LOVE ||
+                     emotion_ == Emotion::PROUD;
   drawEye(sprite, static_cast<int16_t>(body.leftEyeX), static_cast<int16_t>(body.leftEyeY),
           static_cast<int16_t>(blink && gesture_ == Gesture::WINK_L ? 3 : height), happy,
           blink && gesture_ == Gesture::WINK_L, true);

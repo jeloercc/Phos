@@ -49,10 +49,39 @@ void sendSnapshot() {
 
 Mood moodFor(const char *state) {
   if (!strcmp(state, "SPEAKING")) return Mood::SPEAKING;
-  if (!strcmp(state, "SLEEP")) return Mood::SLEEPY;
+  if (!strcmp(state, "SLEEP")) return Mood::SLEEP;
   if (!strcmp(state, "THINKING")) return Mood::THINKING;
   if (!strcmp(state, "LISTENING")) return Mood::LISTENING;
+  if (!strcmp(state, "ERROR")) return Mood::ERROR;
+  if (!strcmp(state, "OFF")) return Mood::OFF;
+  if (!strcmp(state, "BOOT")) return Mood::BOOT;
+  if (!strcmp(state, "PET")) return Mood::PET;
   return Mood::IDLE;
+}
+bool setEmotionByName(const char *name, uint8_t intensity, uint32_t holdMs) {
+  static const char *names[] = {"NEUTRAL", "HAPPY", "JOY", "LOVE", "SAD", "ANGRY",
+                                "SURPRISED", "SCARED", "SKEPTICAL", "CONFUSED",
+                                "CURIOUS", "FOCUSED", "BORED", "SHY", "PROUD",
+                                "DETERMINED", "GLITCH"};
+  for (uint8_t index = 0; index < 17; ++index) {
+    if (!strcmp(name, names[index])) {
+      eyes.setEmotion(static_cast<Emotion>(index), intensity, holdMs);
+      return true;
+    }
+  }
+  return false;
+}
+bool setGestureByName(const char *name) {
+  static const char *names[] = {"WINK_L", "WINK_R", "CONFUSED", "LAUGH", "NOD",
+                                "SHAKE", "ROLL", "STARTLE", "PEEK", "DIVE", "LOOP",
+                                "SIGH"};
+  for (uint8_t index = 0; index < 12; ++index) {
+    if (!strcmp(name, names[index])) {
+      eyes.gesture(static_cast<Gesture>(min<uint8_t>(index, 10)));
+      return true;
+    }
+  }
+  return false;
 }
 void applyState(const char *state) {
   eyes.setMood(moodFor(state));
@@ -70,11 +99,25 @@ void command(char *value) {
   if (!strcmp(value, "PING")) Serial.println("OK:PONG");
   else if (!strcmp(value, "SNAP")) { sendSnapshot(); }
   else if (!strcmp(value, "PAL")) { paletteOk(); }
-  else if (!strcmp(value, "DEMO")) { applyState("THINKING"); Serial.println("OK:DEMO"); }
+  else if (!strcmp(value, "DEMO")) { applyState("BOOT"); Serial.println("OK:DEMO"); }
   else if (!strcmp(value, "GALLERY")) { eyes.setMood(Mood::HAPPY); Serial.println("OK:GALLERY"); }
   else if (!strcmp(value, "IDLE") || !strcmp(value, "LISTENING") ||
            !strcmp(value, "THINKING") || !strcmp(value, "SPEAKING") || !strcmp(value, "SLEEP")) {
     applyState(value); Serial.print("OK:"); Serial.println(value);
+  } else if (!strncmp(value, "STATE ", 6)) {
+    const char *state = value + 6;
+    if (!strcmp(state, "ALERT")) {
+      eyes.gesture(Gesture::STARTLE);
+      eyes.setEmotion(Emotion::GLITCH, 100, 400);
+    }
+    applyState(state); Serial.print("OK:"); Serial.println(state);
+  } else if (!strncmp(value, "FEEL ", 5)) {
+    char name[16]; int intensity; unsigned hold;
+    if (sscanf(value + 5, "%15s %d %u", name, &intensity, &hold) == 3 &&
+        intensity >= 0 && intensity <= 100 &&
+        setEmotionByName(name, static_cast<uint8_t>(intensity), hold)) {
+      Serial.print("OK:FEEL "); Serial.println(name);
+    } else error("BAD_FEEL");
   } else if (!strncmp(value, "MOOD ", 5)) {
     applyState(value + 5); Serial.print("OK:"); Serial.println(value + 5);
   } else if (!strncmp(value, "GOTO ", 5)) {
@@ -94,7 +137,10 @@ void command(char *value) {
     else if (!strcmp(name, "SINK")) body.setBehavior(Behavior::SINK);
     else { error("BAD_BEHAVIOR"); return; }
     Serial.println("OK:BEHAVIOR");
-  } else if (!strncmp(value, "GESTURE ", 8)) { eyes.gesture(Gesture::LAUGH); Serial.println("OK:GESTURE"); }
+  } else if (!strncmp(value, "GESTURE ", 8)) {
+    if (setGestureByName(value + 8)) { Serial.print("OK:GESTURE "); Serial.println(value + 8); }
+    else error("BAD_GESTURE");
+  }
   else if (*value) error("UNKNOWN_COMMAND");
   ++commands;
 }
