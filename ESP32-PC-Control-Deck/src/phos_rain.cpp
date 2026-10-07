@@ -76,7 +76,7 @@ void PhosRain::draw(TFT_eSprite &sprite) {
         const Drop &item = drops_[x][drop];
         const int distance = static_cast<int>(item.head) - y;
         if (item.active && distance >= 0 && distance < item.tail) {
-          const int value = distance == 0 ? 9 : 8 - (distance * 7 / item.tail);
+          const int value = distance == 0 ? 6 : 5 - (distance * 4 / item.tail);
           if (value > brightness) brightness = value;
         }
       }

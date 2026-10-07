@@ -51,7 +51,7 @@ def blobs(pixels):
     seen = set()
     result = []
     for start, value in enumerate(pixels):
-        if value not in (8, 9) or start in seen:
+        if value not in (6, 7, 8, 9) or start in seen:
             continue
         stack = [start]
         seen.add(start)
@@ -61,7 +61,7 @@ def blobs(pixels):
             x, y = point % 320, point // 320
             points.append((x, y))
             for neighbor in (point - 1, point + 1, point - 320, point + 320):
-                if 0 <= neighbor < len(pixels) and pixels[neighbor] in (8, 9) and neighbor not in seen:
+                if 0 <= neighbor < len(pixels) and pixels[neighbor] in (6, 7, 8, 9) and neighbor not in seen:
                     if abs(neighbor % 320 - x) + abs(neighbor // 320 - y) == 1:
                         seen.add(neighbor)
                         stack.append(neighbor)
@@ -138,7 +138,11 @@ def analyze(pixels, frame_path):
         "RAIN_ROWS": rows >= 18,
         "EYES_TWO_BLOBS": len(eye_blobs) == 2 and all(
             18 <= blob[2] - blob[0] + 1 <= 34 and
-            24 <= blob[3] - blob[1] + 1 <= 44 for blob in eye_blobs),
+            24 <= blob[3] - blob[1] + 1 <= 44 and
+            len({pixels[y * 320 + x] for y in range(blob[1], blob[3] + 1)
+                 for x in range(blob[0], blob[2] + 1)
+                 if pixels[y * 320 + x] in (6, 7, 8, 9)}) >= 3
+            for blob in eye_blobs),
         "BLACK_RATIO": black_ratio >= 0.50,
         "BAND": band_ok,
         "EDGE_LINE": edge_ok,

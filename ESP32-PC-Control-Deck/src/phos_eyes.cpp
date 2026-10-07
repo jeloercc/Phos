@@ -42,13 +42,15 @@ void PhosEyes::drawEye(TFT_eSprite &sprite, int16_t x, int16_t y, int16_t height
                        bool happy, bool wink, bool left) {
   constexpr int16_t width = 26;
   const int16_t radius = min<int16_t>(width, height) / 2;
-  sprite.fillRoundRect(x - width / 2 - 7, y - height / 2 - 7, width + 14, height + 14, radius + 7, 2);
-  sprite.fillRoundRect(x - width / 2 - 4, y - height / 2 - 4, width + 8, height + 8, radius + 4, 3);
-  sprite.fillRoundRect(x - width / 2, y - height / 2, width, height, radius, 8);
+  sprite.fillRoundRect(x - width / 2 - 3, y - height / 2 - 3, width + 6, height + 6,
+                       radius + 3, 2);
+  sprite.fillRoundRect(x - width / 2, y - height / 2, width, height, radius, 6);
   if (height > 10 && !wink) {
-    sprite.fillRoundRect(x - width / 2 + 5, y - height / 2 + 5, width - 10, height - 10,
-                         max<int16_t>(1, radius - 5), 9);
-    sprite.fillRect(x + (left ? -5 : 2), y - height / 2 + 7, 3, 3, 9);
+    sprite.fillRoundRect(x - width / 2 + 3, y - height / 2 + 3, width - 6, height - 6,
+                         max<int16_t>(1, radius - 3), 7);
+    sprite.fillRoundRect(x - width / 2 + 7, y - height / 2 + 7, width - 14, height - 14,
+                         max<int16_t>(1, radius - 7), 8);
+    sprite.fillRect(x + (left ? -5 : 2), y - height / 2 + 8, 3, 3, 9);
   }
   if (happy) sprite.fillEllipse(x, y + height / 4, width / 2, max<int16_t>(2, height / 3), 0);
   if (mood_ == Mood::SAD || mood_ == Mood::ANGRY) {
