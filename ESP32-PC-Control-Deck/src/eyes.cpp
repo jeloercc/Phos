@@ -45,11 +45,11 @@ const EyeShape EMOTIONS[20][2] = {
     {{0,0,0,0.75,1,0}, {0,0,0,0.75,1,0}}, // LOVE (3)
     {{0,0.4,0,0,1,4}, {0,0.4,0,0,1,4}}, // SAD (4) - Outer corners low, 4px lower
     {{0.4,0,0,0,0.7,0}, {0.4,0,0,0,0.7,0}}, // ANGRY (5) - Inner corners low, height 70%
-    {{0,0,0,0,1,0}, {0,0,0,0,1,0}}, // SURPRISED (6) - Fully open
+    {{0,0,0.18,0,1.2,0}, {0,0,0.18,0,1.2,0}}, // SURPRISED (6) - Larger, rounder
     {{0,0,0.45,0,1,0}, {0,0,0.45,0,1,0}}, // SCARED (7) - Flat bottom
     {{0.4,0.4,0,0,0.5,0}, {0.15,0.15,0,0,1,0}}, // SKEPTICAL (8) - One eye 50% height
     {{0.1,0.5,0,0,1,0}, {0.5,0.1,0,0,1,0}}, // CONFUSED (9) - Asymmetric anger/sad
-    {{0,0,0,0,1,0}, {0,0,0,0,1,0}}, // CURIOUS (10) - Base open, dynamics added in drawEyes
+    {{0,0,0,0,1.15,0}, {0,0,0,0,1,0}}, // CURIOUS (10) - Gaze-side eye taller
     {{0.35,0.35,0.3,0,1,0}, {0.35,0.35,0.3,0,1,0}}, // FOCUSED (11) - Squint
     {{0.5,0.5,0.25,0,1,0}, {0.5,0.5,0.25,0,1,0}}, // BORED (12)
     {{0.5,0.15,0.4,0,1,0}, {0.15,0.5,0.4,0,1,0}}, // SHY (13)
@@ -90,7 +90,11 @@ uint32_t nextBlinkAt = 0;
 uint32_t blinkStartedAt = 0;
 uint32_t frameCount = 0;
 uint32_t stageCodeUs = 0, stageEyesUs = 0, stagePushUs = 0, totalFrameUs = 0;
+uint32_t totalCodeUs = 0, totalEyesUs = 0, totalPushUs = 0;
 uint16_t fpsFrames = 0;
+bool demoMode = false;
+uint8_t demoStep = 0;
+uint32_t demoAt = 0;
 char serialBuffer[64];
 uint8_t serialLength = 0;
 bool lastBoot = HIGH;
@@ -136,6 +140,7 @@ void handleCommand(const char *command) {
   } else if (strcmp(command, "EXCITED") == 0) { setEmotion(JOY); Serial.println("OK:EXCITED");
   } else if (strcmp(command, "LOVING") == 0) { setEmotion(LOVE); Serial.println("OK:LOVING");
   } else if (strcmp(command, "GALLERY") == 0) { galleryMode = true; Serial.println("OK:GALLERY");
+  } else if (strcmp(command, "DEMO") == 0) { demoMode = true; galleryMode = false; demoStep = 0; demoAt = millis(); Serial.println("OK:DEMO");
   } else if (strcmp(command, "CLOSE") == 0) { setPresence(CLOSE); stateStartMs = millis(); Serial.println("OK:CLOSE");
   } else if (strcmp(command, "DRIFT") == 0) { setPresence(DRIFT); Serial.println("OK:DRIFT");
   } else if (strcmp(command, "DEBUG ON") == 0) { debugMode = true; Serial.println("OK:DEBUG ON");
@@ -323,7 +328,7 @@ void drawEye(int16_t cx, int16_t cy, float scale, EyeShape shape, bool isLeft, i
   frame.fillRoundRect(cx - w/2, cy - h/2, w, h, r, 6);
 
   int16_t i7 = static_cast<int16_t>(12 * scale);
-  int16_t i8 = static_cast<int16_t>(26 * scale);
+  int16_t i8 = static_cast<int16_t>(30 * scale);
 
   if (w > i7*2 && h > i7*2) frame.fillRoundRect(cx - w/2 + i7, cy - h/2 + i7, w - i7*2, h - i7*2, max<int16_t>(1, r - i7), 7);
   if (w > i8*2 && h > i8*2) frame.fillRoundRect(cx - w/2 + i8, cy - h/2 + i8, w - i8*2, h - i8*2, max<int16_t>(1, r - i8), 8);
@@ -465,7 +470,9 @@ void drawEyes(uint32_t now) {
   int16_t cxL = pairCx - static_cast<int16_t>(62 * scale);
   int16_t cxR = pairCx + static_cast<int16_t>(62 * scale);
 
+  const uint32_t codeStarted = micros();
   drawCode(now, cxL, cxR, pairCy, scale);
+  stageCodeUs = micros() - codeStarted;
 
   drawEye(cxL, pairCy, scale, L, true, gaze.x, gaze.y, breath);
   drawEye(cxR, pairCy, scale, R, false, gaze.x, gaze.y, breath);
@@ -473,7 +480,12 @@ void drawEyes(uint32_t now) {
   if (debugMode) {
       frame.setTextColor(3);
       char dbg[64];
-      sprintf(dbg, "ST:%d EMO:%s PR:%s FPS:%.1f", (int)currentState, EMOTION_NAMES[emotion], presence == CLOSE ? "C" : "D", currentFps);
+      static const char *STATE_NAMES[] = {"BOOT", "IDLE", "LISTENING", "THINKING", "SPEAKING", "ERROR", "OFF", "SLEEP", "PET"};
+      static const char *GESTURE_NAMES[] = {"NONE", "WINK_L", "WINK_R", "CONFUSED", "LAUGH", "NOD", "SHAKE", "ROLL", "STARTLE", "SIGH", "PEEK", "DIVE", "LOOP"};
+      sprintf(dbg, "ST:%s EMO:%s GE:%s PR:%s FPS:%.1f",
+              STATE_NAMES[static_cast<uint8_t>(currentState)], EMOTION_NAMES[emotion],
+              GESTURE_NAMES[static_cast<uint8_t>(currentGesture)],
+              presence == CLOSE ? "C" : "D", currentFps);
       frame.setCursor(2, H - 10);
       frame.print(dbg);
   }
@@ -488,8 +500,8 @@ void drawGallery(uint32_t now) {
     for (int i=0; i<20; ++i) {
         int cx = (i % 5) * cellW + cellW/2;
         int cy = (i / 5) * cellH + cellH/2 - 4;
-        drawEye(cx - 10, cy, 0.20f, EMOTIONS[i][0], true, 0, 0, 1.0f);
-        drawEye(cx + 10, cy, 0.20f, EMOTIONS[i][1], false, 0, 0, 1.0f);
+        drawEye(cx - 20, cy, 0.50f, EMOTIONS[i][0], true, 0, 0, 1.0f);
+        drawEye(cx + 20, cy, 0.50f, EMOTIONS[i][1], false, 0, 0, 1.0f);
         frame.setTextColor(6);
         int16_t tw = frame.textWidth(EMOTION_NAMES[i]);
         frame.setCursor(cx - tw/2, cy + 18);
@@ -506,11 +518,13 @@ void report(uint32_t now) {
   currentFps = fps;
   Serial.printf("PERF FPS=%.1f frame_us=%lu code_us=%lu eyes_us=%lu push_us=%lu heap=%u largest=%u SPI=%u presence=%s\n",
                 fps, static_cast<unsigned long>(totalFrameUs / max<uint16_t>(1, fpsFrames)),
-                static_cast<unsigned long>(stageCodeUs), static_cast<unsigned long>(stageEyesUs),
-                static_cast<unsigned long>(stagePushUs), ESP.getFreeHeap(),
+                static_cast<unsigned long>(totalCodeUs / max<uint16_t>(1, fpsFrames)),
+                static_cast<unsigned long>(totalEyesUs / max<uint16_t>(1, fpsFrames)),
+                static_cast<unsigned long>(totalPushUs / max<uint16_t>(1, fpsFrames)), ESP.getFreeHeap(),
                 heap_caps_get_largest_free_block(MALLOC_CAP_8BIT),
                 static_cast<unsigned>(SPI_FREQUENCY / 1000000), presence == CLOSE ? "CLOSE" : "DRIFT");
   lastReportAt = now; fpsFrames = 0; totalFrameUs = 0;
+  totalCodeUs = totalEyesUs = totalPushUs = 0;
 }
 }
 
@@ -537,11 +551,31 @@ void loop() {
   if (now - lastFrameAt >= FRAME_MS) {
     const uint32_t started = micros();
     frame.fillSprite(0);
+    if (demoMode && now - demoAt >= 2500) {
+      demoAt = now;
+      static const State states[] = {State::BOOT, State::IDLE, State::LISTENING, State::THINKING,
+                                     State::SPEAKING, State::ERROR, State::OFF, State::SLEEP, State::PET};
+      static const Emotion emotions[] = {NEUTRAL, HAPPY, JOY, LOVE, SAD, ANGRY, SURPRISED,
+                                        SCARED, SKEPTICAL, CONFUSED, CURIOUS, FOCUSED, BORED,
+                                        SHY, PROUD, DETERMINED, GLITCH};
+      static const Gesture gestures[] = {Gesture::WINK_L, Gesture::WINK_R, Gesture::CONFUSED,
+                                         Gesture::LAUGH, Gesture::NOD, Gesture::SHAKE, Gesture::ROLL,
+                                         Gesture::STARTLE, Gesture::SIGH, Gesture::PEEK,
+                                         Gesture::DIVE, Gesture::LOOP};
+      if (demoStep < 9) setState(states[demoStep]);
+      else if (demoStep < 26) setEmotion(emotions[demoStep - 9]);
+      else if (demoStep < 38) setGesture(gestures[demoStep - 26]);
+      else demoMode = false;
+      ++demoStep;
+    }
     if (galleryMode) drawGallery(now);
     else drawEyes(now);
     const uint32_t pushStarted = micros();
     frame.pushSprite(0, 0);
     stagePushUs = micros() - pushStarted;
+    totalCodeUs += stageCodeUs;
+    totalEyesUs += stageEyesUs;
+    totalPushUs += stagePushUs;
     totalFrameUs += micros() - started;
     ++fpsFrames; ++frameCount; lastFrameAt = now; report(now);
   }

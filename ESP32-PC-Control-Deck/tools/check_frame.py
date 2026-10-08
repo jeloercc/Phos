@@ -125,7 +125,7 @@ def analyze(pixels, path):
         "EDGE_LINE": max(edge_rows) <= lit_columns * 0.25,
         "BETWEEN_EYES": between,
         "ABOVE_BELOW": above_below,
-        "AREA_8_9": 0.15 <= ratio <= 0.75,
+        "AREA_8_9": 0.15 <= ratio <= 0.30,
     }
     for name, passed in checks.items():
         print(f"{'PASS' if passed else 'FAIL'} {name}")
