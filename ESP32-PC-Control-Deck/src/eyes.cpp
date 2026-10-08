@@ -37,19 +37,27 @@ const char* EMOTION_NAMES[20] = {
     "DETERMINED", "GLITCH", "DISGUSTED", "MISCHIEVOUS", "SLEEPY"
 };
 
-struct EyeShape { float topInner, topOuter, bottom, smile, heightScale, yOffset; };
+struct EyeShape {
+  float topInner, topOuter, bottom, smile, heightScale, yOffset;
+  float cornerScale, glintScale, tilt, heart, sizeScale;
+  EyeShape(float ti, float to, float b, float s, float hs, float yo,
+            float cs = 1.0f, float gs = 1.0f, float t = 0.0f, float hrt = 0.0f,
+            float ss = 1.0f)
+      : topInner(ti), topOuter(to), bottom(b), smile(s), heightScale(hs), yOffset(yo),
+        cornerScale(cs), glintScale(gs), tilt(t), heart(hrt), sizeScale(ss) {}
+};
 const EyeShape EMOTIONS[20][2] = {
     {{0,0,0,0,1,0}, {0,0,0,0,1,0}}, // NEUTRAL (0)
-    {{0,0,0,0.65,1,0}, {0,0,0,0.65,1,0}}, // HAPPY (1)
-    {{0,0,0,0.9,1,0}, {0,0,0,0.9,1,0}}, // JOY (2)
-    {{0,0,0,0.75,1,0}, {0,0,0,0.75,1,0}}, // LOVE (3)
+    {{0,0,0,0.45,1,0}, {0,0,0,0.45,1,0}}, // HAPPY (1)
+    {{0,0,0,0.9,0.6,0}, {0,0,0,0.9,0.6,0}}, // JOY (2)
+    {{0,0,0,0,1,0,1,1,0,1}, {0,0,0,0,1,0,1,1,0,1}}, // LOVE (3) - hearts
     {{0,0.4,0,0,1,4}, {0,0.4,0,0,1,4}}, // SAD (4) - Outer corners low, 4px lower
     {{0.4,0,0,0,0.7,0}, {0.4,0,0,0,0.7,0}}, // ANGRY (5) - Inner corners low, height 70%
-    {{0,0,0.18,0,1.2,0}, {0,0,0.18,0,1.2,0}}, // SURPRISED (6) - Larger, rounder
+    {{0,0,0,0,1.25,-6,1,1.5,0,0,1.25}, {0,0,0,0,1.25,-6,1,1.5,0,0,1.25}}, // SURPRISED (6)
     {{0,0,0.45,0,1,0}, {0,0,0.45,0,1,0}}, // SCARED (7) - Flat bottom
     {{0.4,0.4,0,0,0.5,0}, {0.15,0.15,0,0,1,0}}, // SKEPTICAL (8) - One eye 50% height
     {{0.1,0.5,0,0,1,0}, {0.5,0.1,0,0,1,0}}, // CONFUSED (9) - Asymmetric anger/sad
-    {{0,0,0,0,1.15,0}, {0,0,0,0,1,0}}, // CURIOUS (10) - Gaze-side eye taller
+    {{0,0,0,0,1.2,0,1,1,6,0}, {0,0,0,0,0.9,0,1,1,6,0}}, // CURIOUS (10)
     {{0.35,0.35,0.3,0,1,0}, {0.35,0.35,0.3,0,1,0}}, // FOCUSED (11) - Squint
     {{0.5,0.5,0.25,0,1,0}, {0.5,0.5,0.25,0,1,0}}, // BORED (12)
     {{0.5,0.15,0.4,0,1,0}, {0.15,0.5,0.4,0,1,0}}, // SHY (13)
@@ -129,7 +137,7 @@ void setGesture(Gesture next) {
 
 void handleCommand(const char *command) {
   if (strcmp(command, "PING") == 0) { Serial.println("OK:PONG");
-  } else if (strcmp(command, "IDLE") == 0) { setState(State::IDLE); setEmotion(NEUTRAL); Serial.println("OK:IDLE");
+  } else if (strcmp(command, "IDLE") == 0) { galleryMode = false; setState(State::IDLE); setEmotion(NEUTRAL); Serial.println("OK:IDLE");
   } else if (strcmp(command, "LISTENING") == 0) { setState(State::LISTENING); setEmotion(NEUTRAL); Serial.println("OK:LISTENING");
   } else if (strcmp(command, "THINKING") == 0) { setState(State::THINKING); setEmotion(CURIOUS); Serial.println("OK:THINKING");
   } else if (strcmp(command, "SPEAKING") == 0) { setState(State::SPEAKING); setEmotion(HAPPY); Serial.println("OK:SPEAKING");
@@ -316,26 +324,60 @@ void drawCode(uint32_t now, int16_t cxL, int16_t cxR, int16_t cy, float scale) {
 }
 
 void drawEye(int16_t cx, int16_t cy, float scale, EyeShape shape, bool isLeft, int16_t gazeX, int16_t gazeY, float breath) {
-  int16_t w = static_cast<int16_t>(96 * scale);
-  int16_t h = static_cast<int16_t>(150 * scale * breath * shape.heightScale);
+  int16_t w = static_cast<int16_t>(96 * scale * shape.sizeScale);
+  int16_t h = static_cast<int16_t>(150 * scale * breath * shape.heightScale * shape.sizeScale);
+  cy += static_cast<int16_t>(shape.tilt * (gazeX >= 0 ? 1.0f : -1.0f));
   cy += static_cast<int16_t>(shape.yOffset * scale);
   
   if (h <= 0) return; // Fully closed
   
   int16_t r = min(w, h) / 2;
+  r = min<int16_t>(r, static_cast<int16_t>(r * shape.cornerScale));
 
   frame.fillRoundRect(cx - w/2 - 4, cy - h/2 - 4, w + 8, h + 8, r + 4, 2);
-  frame.fillRoundRect(cx - w/2, cy - h/2, w, h, r, 6);
+  if (shape.heart > 0.5f) {
+    const int16_t hr = max<int16_t>(2, min(w, h) / 4);
+    frame.fillCircle(cx - hr, cy - h/2 + hr, hr, 6);
+    frame.fillCircle(cx + hr, cy - h/2 + hr, hr, 6);
+    frame.fillTriangle(cx - 2*hr, cy - h/2 + hr, cx + 2*hr, cy - h/2 + hr,
+                       cx, cy + h/2, 6);
+  } else {
+    frame.fillRoundRect(cx - w/2, cy - h/2, w, h, r, 6);
+  }
 
   int16_t i7 = static_cast<int16_t>(12 * scale);
   int16_t i8 = static_cast<int16_t>(30 * scale);
 
-  if (w > i7*2 && h > i7*2) frame.fillRoundRect(cx - w/2 + i7, cy - h/2 + i7, w - i7*2, h - i7*2, max<int16_t>(1, r - i7), 7);
-  if (w > i8*2 && h > i8*2) frame.fillRoundRect(cx - w/2 + i8, cy - h/2 + i8, w - i8*2, h - i8*2, max<int16_t>(1, r - i8), 8);
+  if (w > i7*2 && h > i7*2) {
+    if (shape.heart > 0.5f) {
+      const int16_t hr7 = max<int16_t>(2, min(w - i7*2, h - i7*2) / 4);
+      frame.fillCircle(cx - hr7, cy - h/2 + i7 + hr7, hr7, 7);
+      frame.fillCircle(cx + hr7, cy - h/2 + i7 + hr7, hr7, 7);
+      frame.fillTriangle(cx - 2*hr7, cy - h/2 + i7 + hr7,
+                         cx + 2*hr7, cy - h/2 + i7 + hr7,
+                         cx, cy + h/2 - i7, 7);
+    } else {
+      frame.fillRoundRect(cx - w/2 + i7, cy - h/2 + i7, w - i7*2, h - i7*2,
+                          max<int16_t>(1, r - i7), 7);
+    }
+  }
+  if (w > i8*2 && h > i8*2) {
+    if (shape.heart > 0.5f) {
+      const int16_t hr8 = max<int16_t>(2, min(w - i8*2, h - i8*2) / 4);
+      frame.fillCircle(cx - hr8, cy - h/2 + i8 + hr8, hr8, 8);
+      frame.fillCircle(cx + hr8, cy - h/2 + i8 + hr8, hr8, 8);
+      frame.fillTriangle(cx - 2*hr8, cy - h/2 + i8 + hr8,
+                         cx + 2*hr8, cy - h/2 + i8 + hr8,
+                         cx, cy + h/2 - i8, 8);
+    } else {
+      frame.fillRoundRect(cx - w/2 + i8, cy - h/2 + i8, w - i8*2, h - i8*2,
+                          max<int16_t>(1, r - i8), 8);
+    }
+  }
 
   int16_t gx = static_cast<int16_t>(gazeX * scale * 0.25f);
   int16_t gy = static_cast<int16_t>(gazeY * scale * 0.25f);
-  int16_t glintSize = max<int16_t>(2, static_cast<int16_t>(10 * scale));
+  int16_t glintSize = max<int16_t>(2, static_cast<int16_t>(10 * scale * shape.glintScale));
   frame.fillRect(cx + gx - glintSize/2, cy + gy - glintSize/2 - (h/4), glintSize, glintSize, 9);
 
   int16_t yInner = static_cast<int16_t>(150 * scale * breath * shape.heightScale * shape.topInner);
@@ -366,7 +408,12 @@ EyeShape lerpShape(EyeShape a, EyeShape b, float t) {
         a.bottom + (b.bottom - a.bottom) * t,
         a.smile + (b.smile - a.smile) * t,
         a.heightScale + (b.heightScale - a.heightScale) * t,
-        a.yOffset + (b.yOffset - a.yOffset) * t
+        a.yOffset + (b.yOffset - a.yOffset) * t,
+        a.cornerScale + (b.cornerScale - a.cornerScale) * t,
+        a.glintScale + (b.glintScale - a.glintScale) * t,
+        a.tilt + (b.tilt - a.tilt) * t,
+        a.heart + (b.heart - a.heart) * t,
+        a.sizeScale + (b.sizeScale - a.sizeScale) * t
     };
 }
 
@@ -385,11 +432,6 @@ void drawEyes(uint32_t now) {
   EyeShape L = lerpShape(prevL, currL, ease);
   EyeShape R = lerpShape(prevR, currR, ease);
   
-  if (emotion == CURIOUS) {
-      if (gaze.x < -10) { L.heightScale = 1.15f; R.heightScale = 1.0f; }
-      else if (gaze.x > 10) { R.heightScale = 1.15f; L.heightScale = 1.0f; }
-  }
-
   float pEase = presenceEase(now);
   float tScale = (presence == CLOSE) ? 1.0f : 0.35f;
   float pScale = (prevPresence == CLOSE) ? 1.0f : 0.35f;
@@ -500,8 +542,8 @@ void drawGallery(uint32_t now) {
     for (int i=0; i<20; ++i) {
         int cx = (i % 5) * cellW + cellW/2;
         int cy = (i / 5) * cellH + cellH/2 - 4;
-        drawEye(cx - 20, cy, 0.50f, EMOTIONS[i][0], true, 0, 0, 1.0f);
-        drawEye(cx + 20, cy, 0.50f, EMOTIONS[i][1], false, 0, 0, 1.0f);
+        drawEye(cx - 16, cy, 0.30f, EMOTIONS[i][0], true, 0, 0, 1.0f);
+        drawEye(cx + 16, cy, 0.30f, EMOTIONS[i][1], false, 0, 0, 1.0f);
         frame.setTextColor(6);
         int16_t tw = frame.textWidth(EMOTION_NAMES[i]);
         frame.setCursor(cx - tw/2, cy + 18);
